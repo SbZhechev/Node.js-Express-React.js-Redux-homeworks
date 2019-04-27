@@ -1,0 +1,25 @@
+{
+  "name": "homework1",
+  "version": "1.0.0",
+  "description": "Course homework",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SbZhechev/Node.js-Express-React.js-Redux-homeworks/tree/master/Homework1"
+  },
+  "author": "Stanislav",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.18.3",
+    "express": "^4.16.4",
+    "indicative": "^5.0.8",
+    "mongodb": "^3.2.3"
+  },
+  "devDependencies": {
+    "nodemon": "^1.18.11"
+  }
+}
