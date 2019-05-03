@@ -1,6 +1,5 @@
 const express = require('express');
 const mongodb = require('mongodb');
-const mongoClient = require('mongodb').MongoClient;
 const bodyParser = require('body-parser');
 const indicative = require('indicative');
 
@@ -32,12 +31,11 @@ router.post('/', (req, res) => {
             picture: 'required|url',
             bio: 'string|max:512',
             accountStatus: 'required|string',
-            registrationDate: 'date',
-            lastModified: 'string'
         })
         .then(newUser => {
             const date = new Date();
-            newUser.lastModified = `0${date.getDate()}.0${date.getMonth()}.${date.getFullYear()} ${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`
+            newUser.registrationDate = `${date.getDate() - 2}.${date.getMonth()-1}.${date.getFullYear()} ${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`
+            newUser.lastModified = `${date.getDate()}.${date.getMonth()}.${date.getFullYear()} ${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`;
             dataBase.collection('users').insertOne(newUser)
             .then(result => {
                     if(result.result.ok && result.insertedCount === 1){
@@ -99,8 +97,7 @@ router.put('/:userId', (req, res) => {
                     accountType: newAccountType,
                     picture: newPicture,
                     bio: newBio,
-                    accountStatus: newAccountStatus,
-                    registrationDate: newRegistrationDate } = updatedUser;
+                    accountStatus: newAccountStatus } = updatedUser;
             dataBase.collection('users').updateOne({_id:searchId},
                 {$set:{ name: newName, 
                     username: newUserName, 
@@ -110,8 +107,7 @@ router.put('/:userId', (req, res) => {
                     picture: newPicture,
                     bio: newBio,
                     accountStatus: newAccountStatus,
-                    registrationDate: newRegistrationDate,
-                    lastModified: `0${newlastModified.getDate()}.0${newlastModified.getMonth()+1}.${newlastModified.getFullYear()} ${newlastModified.getHours()}-${newlastModified.getMinutes()}-${newlastModified.getSeconds()}`}},
+                    lastModified: `${newlastModified.getDate()}.${newlastModified.getMonth()+1}.${newlastModified.getFullYear()} ${newlastModified.getHours()}-${newlastModified.getMinutes()}-${newlastModified.getSeconds()}`}},
                     (err, result) => {
                         if(result.result.ok && result.n !== 0){
                             res.status(204);
@@ -149,5 +145,132 @@ router.delete('/:userId', (req, res) => {
     });
 })
 
+router.get('/:userId/recipes', (req, res) => {
+    var dataBase = req.app.locals.db;
+    var searchId = new mongodb.ObjectID(req.params.userId);
+    dataBase.collection('recipes').find({postedBy: searchId}).toArray().then(recipes => {
+        if(recipes.length > 0) {
+            res.status(200);
+            res.json(recipes);
+        } else {
+            res.status(400);
+            res.json('No data');
+        };
+    }).catch(err => {
+        res.status(500);
+        res.json('Server error');
+        throw err;
+    })
+});
+
+router.post('/:userId/recipes', (req, res) => {
+    var dataBase = req.app.locals.db;
+    const date = new Date();
+    const userId = new mongodb.ObjectID(req.params.userId);
+    const newRecipe = req.body;
+    indicative.validate(newRecipe, 
+        {
+            name: 'required|string|max:80',
+            shortDescription: 'required|string|max:256',
+            time: 'required|integer',
+            products: 'required|array',
+            picture: 'url',
+            fullDescription: 'string|max:2048',
+            keyWords: 'array',
+        }).then(newRecipe => {
+            newRecipe.postedBy = userId;
+            newRecipe.postedOn = `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()} ${date.getHours()}hr-${date.getMinutes()}mn`;
+            dataBase.collection('recipes').insertOne(newRecipe).then(result => {
+                if(result.result.ok && result.insertedCount === 1){
+                    const uri = req.baseUrl + req.url + '/' + newRecipe._id;
+                    res.status(201);
+                    res.location(uri);
+                    res.json(newRecipe);
+                } else {
+                    res.status(500);
+                    res.json('Server error');
+                };
+            });
+        }).catch(errors => {
+            res.status(400);
+            res.json(errors);
+        });
+});
+
+router.get('/:userId/recipes/:recipeId', (req, res) => {
+    var dataBase = req.app.locals.db;
+    var posterId = new mongodb.ObjectID(req.params.userId);
+    var searchId = new mongodb.ObjectID(req.params.recipeId);
+    dataBase.collection('recipes').find({postedBy: posterId, _id: searchId}).toArray().then(recipes=>{
+        if(recipes.length > 0) {
+            res.status(200);
+            res.json(recipes);
+        } else {
+            res.status(400);
+            res.json('No such record');
+        };
+    }).catch(err => {
+        res.status(500);
+        res.json('Server error');
+    })
+})
+
+router.put('/:userId/recipes/:recipeId', (req, res) => {
+    var dataBase = req.app.locals.db;
+    var posterId = new mongodb.ObjectID(req.params.userId);
+    var searchId = new mongodb.ObjectID(req.params.recipeId);
+    const updatedRecipe = req.body;
+    indicative.validate(updatedRecipe, 
+        {
+            name: 'required|string|max:80',
+            shortDescription: 'required|string|max:256',
+            time: 'required|integer',
+            products: 'required|array',
+            picture: 'url',
+            fullDescription: 'string|max:2048',
+            keyWords: 'array',
+        }).then(updatedRecipe => {
+            const {name, shortDescription, time, products, picture, fullDescription, keyWords} = updatedRecipe;
+            const date = new Date();
+            lastModified = `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()} ${date.getHours()}hr-${date.getMinutes()}mn`;
+            updatedRecipe.lastModified = lastModified;
+            dataBase.collection('recipes').updateOne({postedBy: posterId, _id: searchId},
+                {$set:{name, shortDescription, time, products, picture, fullDescription, keyWords ,lastModified}})
+                .then(result => {
+                    if(result.result.ok && result.n !== 0){
+                        res.status(204);
+                        res.json(result);
+                    } else {
+                        res.status(500);
+                        res.json('No such record');
+                    };
+                });
+        }).catch(errors => {
+            res.status(400);
+            res.json(errors);
+            console.log(errors);
+        });
+});
+
+router.delete('/:userId/recipes/:recipeId', (req, res) => {
+    var dataBase = req.app.locals.db;
+    var posterId = new mongodb.ObjectID(req.params.userId);
+    var recipeId = new mongodb.ObjectID(req.params.recipeId);
+    dataBase.collection('recipes').deleteOne({postedBy: posterId,_id: recipeId})
+    .then(result => {
+        if(result.result.ok && result.result.n === 1){
+            res.status(204);
+            res.json(result);
+        }
+        else {
+            res.status(500);
+            res.json('No such record.');
+        };
+    })
+    .catch(err => {
+        res.status(400);
+        throw err;
+    });
+})
 
 module.exports = router;
